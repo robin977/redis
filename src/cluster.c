@@ -715,8 +715,8 @@ void clusterAcceptHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     }
 }
 
-/* Return the approximated number of sockets we are using in order to
- * take the cluster bus connections. */
+/* Return the approximated number of sockets we are using in order to 例：3主3从的cluster集群（6个实例）。每个实例自身会创建 (6-1)*2=10个内部连接
+ * take the cluster bus connections.如果是cluster集群模式，返回(节点数-1)*2。节点数包含主节点与从节点 */
 unsigned long getClusterConnectionsCount(void) {
     /* We decrement the number of nodes by one, since there is the
      * "myself" node too in the list. Each node uses two file descriptors,

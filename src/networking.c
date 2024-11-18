@@ -998,8 +998,8 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
         return;
     }
 
-    /* Limit the number of connections we take at the same time.
-     *
+    /* Limit the number of connections we take at the same time. 如果是cluster集群模式，返回(节点数-1)*2。节点数包含主节点与从节点
+     * 如果是cluster集群，则判断外部链接数(server.clients)+内部连接数（clusterConn）的大小是否超过maxclients并输出相应错误
      * Admission control will happen before a client is created and connAccept()
      * called, because we don't want to even start transport-level negotiation
      * if rejected. */
