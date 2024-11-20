@@ -1982,40 +1982,48 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         checkChildrenDone();
     } else {
         /* If there is not a background saving/rewrite in progress check if
-         * we have to save/rewrite now. */
+         * we have to save/rewrite now. 如果没有正在进行的后台保存/重写检查我们是否必须现在保存/重写 */
         for (j = 0; j < server.saveparamslen; j++) {
             struct saveparam *sp = server.saveparams+j;
 
             /* Save if we reached the given amount of changes,
              * the given amount of seconds, and if the latest bgsave was
              * successful or if, in case of an error, at least
-             * CONFIG_BGSAVE_RETRY_DELAY seconds already elapsed. */
+             * CONFIG_BGSAVE_RETRY_DELAY seconds already elapsed.
+             * 数据库的键被修改的次数大于SAVE命令参数指定的修改次数，且已经过了SAVE命令参数指定的秒数
+             * */
             if (server.dirty >= sp->changes &&
                 server.unixtime-server.lastsave > sp->seconds &&
                 (server.unixtime-server.lastbgsave_try >
                  CONFIG_BGSAVE_RETRY_DELAY ||
                  server.lastbgsave_status == C_OK))
             {
-                serverLog(LL_NOTICE,"%d changes in %d seconds. Saving...",
-                    sp->changes, (int)sp->seconds);
+                serverLog(LL_NOTICE,"%d changes in %d seconds. Saving...", sp->changes, (int)sp->seconds);
                 rdbSaveInfo rsi, *rsiptr;
                 rsiptr = rdbPopulateSaveInfo(&rsi);
+                serverLog(LL_DEBUG,"rdbSaveBackground  %s seconds. Saving...", server.rdb_filename);
                 rdbSaveBackground(server.rdb_filename,rsiptr);
                 break;
             }
         }
 
-        /* Trigger an AOF rewrite if needed. */
+        /* Trigger an AOF rewrite if needed. 是否触发AOF重写操作
+         * server.aof_rewrite_min_size读取auto-aof-rewrite-min-size
+         * server.aof_rewrite_perc读取auto-aof-rewrite-percentage
+         * */
         if (server.aof_state == AOF_ON &&
             !hasActiveChildProcess() &&
             server.aof_rewrite_perc &&
             server.aof_current_size > server.aof_rewrite_min_size)
         {
+            /*上一次重写后的大小*/
             long long base = server.aof_rewrite_base_size ?
                 server.aof_rewrite_base_size : 1;
+            /*AOF文件增长的百分比*/
             long long growth = (server.aof_current_size*100/base) - 100;
+            /*大于设置的百分比100则进行AOF后台重写*/
             if (growth >= server.aof_rewrite_perc) {
-                serverLog(LL_NOTICE,"Starting automatic rewriting of AOF on %lld%% growth",growth);
+                serverLog(LL_DEBUG,"Starting automatic rewriting of AOF on %lld%% growth",growth);
                 rewriteAppendOnlyFileBackground();
             }
         }
@@ -2025,8 +2033,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     updateDictResizePolicy();
 
 
-    /* AOF postponed flush: Try at every cron cycle if the slow fsync
-     * completed. */
+    /* AOF postponed flush: Try at every cron cycle if the slow fsync completed. AOF延迟刷新：如果慢同步完成，则在每个cron周期尝试一次*/
     if (server.aof_flush_postponed_start) flushAppendOnlyFile(0);
 
     /* AOF write errors: in this case we have a buffer to flush as well and
