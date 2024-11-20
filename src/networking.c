@@ -1018,7 +1018,7 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
          * is written and the connection will just drop. */
         if (connWrite(conn,err,strlen(err)) == -1) {
             /* Nothing to do, Just to avoid the warning... */
-        }
+        } /* 累加拒绝数量 */
         server.stat_rejected_conn++;
         connClose(conn);
         return;

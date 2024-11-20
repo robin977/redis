@@ -1852,10 +1852,10 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     UNUSED(clientData);
 
     /* Software watchdog: deliver the SIGALRM that will reach the signal
-     * handler if we don't return here fast enough. */
+     * handler if we don't return here fast enough.如果设置了看门狗，则在过期时间内，递达一个 SIGALRM 信号 */
     if (server.watchdog_period) watchdogScheduleSignal(server.watchdog_period);
 
-    /* Update the time cache. */
+    /* Update the time cache.设置服务器的时间缓存 */
     updateCachedTime(1);
 
     server.hz = server.config_hz;
@@ -1872,13 +1872,14 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
             }
         }
     }
-
+    /*这个宏类似于条件判断，每ms时间执行一次后续的操作 更新服务器的一些统计值*/
     run_with_period(100) {
+        /*命令执行的次数*/
         trackInstantaneousMetric(STATS_METRIC_COMMAND,server.stat_numcommands);
-        trackInstantaneousMetric(STATS_METRIC_NET_INPUT,
-                server.stat_net_input_bytes);
-        trackInstantaneousMetric(STATS_METRIC_NET_OUTPUT,
-                server.stat_net_output_bytes);
+        /*网络读到的字节数*/
+        trackInstantaneousMetric(STATS_METRIC_NET_INPUT,server.stat_net_input_bytes);
+        /*写到网络的字节数*/
+        trackInstantaneousMetric(STATS_METRIC_NET_OUTPUT,server.stat_net_output_bytes);
     }
 
     /* We have just LRU_BITS bits per object for LRU information.
@@ -1894,7 +1895,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
      * LRU_CLOCK_RESOLUTION define. */
     server.lruclock = getLRUClock();
 
-    /* Record the max memory used since the server was started. */
+    /* Record the max memory used since the server was started.更新服务器的最大内存使用量峰值 */
     if (zmalloc_used_memory() > server.stat_peak_memory)
         server.stat_peak_memory = zmalloc_used_memory();
 
@@ -1927,18 +1928,19 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     /* We received a SIGTERM, shutting down here in a safe way, as it is
-     * not ok doing so inside the signal handler. */
+     * not ok doing so inside the signal handler.安全的关闭服务器 */
     if (server.shutdown_asap) {
+        /* 关闭服务器前的准备动作，成功则关闭服务器 */
         if (prepareForShutdown(SHUTDOWN_NOFLAGS) == C_OK) exit(0);
         serverLog(LL_WARNING,"SIGTERM received but errors trying to shut down the server, check the logs for more information");
         server.shutdown_asap = 0;
     }
 
-    /* Show some info about non-empty databases */
+    /* Show some info about non-empty databases 打印数据库的信息到日志中 */
     run_with_period(5000) {
         for (j = 0; j < server.dbnum; j++) {
             long long size, used, vkeys;
-
+            /*获取当前数据库的键值对字典的槽位数，键值对字典已使用的数量，过期键字典已使用的数量*/
             size = dictSlots(server.db[j].dict);
             used = dictSize(server.db[j].dict);
             vkeys = dictSize(server.db[j].expires);
@@ -1949,7 +1951,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         }
     }
 
-    /* Show information about connected clients */
+    /* Show information about connected clients 如果服务器不在哨兵模式下，那么周期性打印一些连接client的信息到日志中 */
     if (!server.sentinel_mode) {
         run_with_period(5000) {
             serverLog(LL_DEBUG,
@@ -1960,10 +1962,10 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         }
     }
 
-    /* We need to do a few operations on clients asynchronously. */
+    /* We need to do a few operations on clients asynchronously. 执行client的周期性任务 */
     clientsCron();
 
-    /* Handle background operations on Redis databases. */
+    /* Handle background operations on Redis databases. 执行数据库的周期性任务 */
     databasesCron();
 
     /* Start a scheduled AOF rewrite if this was requested by the user while
@@ -2019,7 +2021,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         }
     }
     /* Just for the sake of defensive programming, to avoid forgeting to
-     * call this function when need. */
+     * call this function when need. 防御性编程*/
     updateDictResizePolicy();
 
 
@@ -2834,7 +2836,7 @@ void initServer(void) {
     signal(SIGPIPE, SIG_IGN);
     setupSignalHandlers();
     makeThreadKillable();
-
+    /* 开启系统日志 */
     if (server.syslog_enabled) {
         openlog(server.syslog_ident, LOG_PID | LOG_NDELAY | LOG_NOWAIT,
             server.syslog_facility);
@@ -2870,10 +2872,10 @@ void initServer(void) {
         serverLog(LL_WARNING, "Failed to configure TLS. Check logs for more info.");
         exit(1);
     }
-
+    /* 创建常用字符集 */
     createSharedObjects();
     adjustOpenFilesLimit();
-    server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
+    server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);   /* 创建AE事件循环器 */
     if (server.el == NULL) {
         serverLog(LL_WARNING,
             "Failed creating the event loop. Error message: '%s'",
@@ -2921,7 +2923,7 @@ void initServer(void) {
         server.db[j].defrag_later = listCreate();
         listSetFreeMethod(server.db[j].defrag_later,(void (*)(void*))sdsfree);
     }
-    evictionPoolAlloc(); /* Initialize the LRU keys pool. */
+    evictionPoolAlloc(); /* Initialize the LRU keys pool. 初始化LRU样本池*/
     server.pubsub_channels = dictCreate(&keylistDictType,NULL);
     server.pubsub_patterns = listCreate();
     server.pubsub_patterns_dict = dictCreate(&keylistDictType,NULL);
@@ -2969,7 +2971,7 @@ void initServer(void) {
 
     /* Create the timer callback, this is our way to process many background
      * operations incrementally, like clients timeout, eviction of unaccessed
-     * expired keys and so forth. */
+     * expired keys and so forth. 创建时间事件处理器 一秒后执行，执行函数serverCron,负责处理 Redis 中的定时任务，如清理过期数据、生成 RDB 文件等；*/
     if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {
         serverPanic("Can't create event loop timers.");
         exit(1);
@@ -3025,7 +3027,7 @@ void initServer(void) {
     /* 32 bit instances are limited to 4GB of address space, so if there is
      * no explicit limit in the user provided configuration we set a limit
      * at 3 GB using maxmemory with 'noeviction' policy'. This avoids
-     * useless crashes of the Redis instance for out of memory. */
+     * useless crashes of the Redis instance for out of memory. 32位实例被限制为4GB的地址空间，所以如果在用户提供的配置中没有明确的限制，我们使用带有“noeviction”策略的maxmemory将限制设置为3gb*/
     if (server.arch_bits == 32 && server.maxmemory == 0) {
         serverLog(LL_WARNING,"Warning: 32 bit instance detected but no memory limit set. Setting 3 GB maxmemory limit with 'noeviction' policy now.");
         server.maxmemory = 3072LL*(1024*1024); /* 3 GB */
@@ -5443,7 +5445,7 @@ int main(int argc, char **argv) {
         loadServerConfig(configfile,options);
         sdsfree(options);
     }
-
+    /* redis进程守护方式设定，读supervised daemonize是否在后台执行，yes：后台运行；no：不是后台运行 */
     server.supervised = redisIsSupervised(server.supervised_mode);
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
@@ -5469,7 +5471,7 @@ int main(int argc, char **argv) {
     redisSetProcTitle(argv[0]);
     redisAsciiArt();
     checkTcpBacklogSettings();
-
+    /* Things not needed when running in Sentinel mode. */
     if (!server.sentinel_mode) {
         /* Things not needed when running in Sentinel mode. */
         serverLog(LL_WARNING,"Server initialized");
@@ -5529,10 +5531,10 @@ int main(int argc, char **argv) {
     if (server.maxmemory > 0 && server.maxmemory < 1024*1024) {
         serverLog(LL_WARNING,"WARNING: You specified a maxmemory value that is less than 1MB (current value is %llu bytes). Are you sure this is what you really want?", server.maxmemory);
     }
-
+   /* 绑定cpu. */
     redisSetCpuAffinity(server.server_cpulist);
     setOOMScoreAdj(-1);
-
+    /* 启动AE事件处理器. */
     aeMain(server.el);
     aeDeleteEventLoop(server.el);
     return 0;

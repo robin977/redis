@@ -51,12 +51,12 @@ int checkBlockedClientTimeout(client *c, mstime_t now) {
 /* Check for timeouts. Returns non-zero if the client was terminated.
  * The function gets the current time in milliseconds as argument since
  * it gets called multiple times in a loop, so calling gettimeofday() for
- * each iteration would be costly without any actual gain. */
+ * each iteration would be costly without any actual gain. 定时任务，用于处理客户端连接的超时。这个任务的执行频率通常是每隔 100 毫秒（0.1 秒）运行一次 */
 int clientsCronHandleTimeout(client *c, mstime_t now_ms) {
     time_t now = now_ms/1000;
 
     if (server.maxidletime &&
-        /* This handles the idle clients connection timeout if set. */
+        /* This handles the idle clients connection timeout if set.,就是redis.conf中的timeout，最大空闲时间 */
         !(c->flags & CLIENT_SLAVE) &&   /* No timeout for slaves and monitors */
         !(c->flags & CLIENT_MASTER) &&  /* No timeout for masters */
         !(c->flags & CLIENT_BLOCKED) && /* No timeout for BLPOP */

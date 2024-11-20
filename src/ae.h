@@ -62,12 +62,12 @@
 
 struct aeEventLoop;
 
-/* Types and data structures */
+/* Types and data structures 重定义函数原型 */
 typedef void aeFileProc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask);
 typedef int aeTimeProc(struct aeEventLoop *eventLoop, long long id, void *clientData);
 typedef void aeEventFinalizerProc(struct aeEventLoop *eventLoop, void *clientData);
 typedef void aeBeforeSleepProc(struct aeEventLoop *eventLoop);
-
+/* aeEventFinalizerProc 一个对eventLoop和clientData处理的函数原型; aeTimeProc -有时间事件时处理时间事件的函数原型 */
 /* File event structure */
 typedef struct aeFileEvent {
     int mask; /* one of AE_(READABLE|WRITABLE|BARRIER) */
